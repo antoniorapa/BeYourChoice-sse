@@ -1,0 +1,26 @@
+\begin{table}[htbp]
+\centering
+\small
+\setlength{\tabcolsep}{6pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{llrrrrr}
+\hline
+Gruppo & Benchmark & Mean (ms) & Std (ms) & Median (ms) & Min (ms) & Ops/s \\
+\hline
+login & test\_bench\_email\_regex\_compiled & 0.000 & 0.000 & 0.000 & 0.000 & 2867112.2 \\
+login & test\_bench\_password\_regex\_compiled & 0.001 & 0.000 & 0.001 & 0.000 & 1731032.2 \\
+login & test\_bench\_bcrypt\_checkpw & 191.082 & 6.679 & 193.658 & 182.025 & 5.2 \\
+materiale & test\_bench\_tipo\_file\_valido & 0.000 & 0.000 & 0.000 & 0.000 & 3306965.8 \\
+materiale & test\_bench\_titolo\_valido & 0.001 & 0.000 & 0.001 & 0.000 & 1781070.8 \\
+materiale & test\_bench\_descrizione\_valida & 0.001 & 0.000 & 0.001 & 0.001 & 1679825.3 \\
+materiale & test\_bench\_mapping\_materiali\_for\_view & 0.123 & 0.022 & 0.117 & 0.109 & 8128.4 \\
+quiz & test\_bench\_regex\_titolo\_tema & 0.001 & 0.000 & 0.001 & 0.001 & 1391418.6 \\
+quiz & test\_bench\_parse\_domanda & 0.003 & 0.000 & 0.003 & 0.003 & 364750.8 \\
+quiz & test\_bench\_tempo\_rimanente\_calc\_only & 0.003 & 0.004 & 0.002 & 0.002 & 319214.5 \\
+quiz & test\_bench\_build\_quiz\_document\_cpu\_only & 0.003 & 0.001 & 0.003 & 0.003 & 315827.2 \\
+quiz & test\_bench\_scoring\_valuta\_quiz\_logic & 0.004 & 0.001 & 0.003 & 0.003 & 274988.7 \\
+\hline
+\end{tabular}
+\caption{Risultati microbenchmark (pytest-benchmark) – run: before.}
+\label{tab:microbench_before}
+\end{table}

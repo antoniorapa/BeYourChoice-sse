@@ -50,42 +50,87 @@ class QuizModel:
 
     @staticmethod
     def genera_domande(tema, numero_domande, modalita_risposta, api_key):
-        """Genera domande utilizzando OpenAI GPT."""
-        openai.api_key = api_key
-        domande = []
-        prompt_base = f"Genera una domanda sul tema: {tema}. "
+        """Genera domande utilizzando OpenAI GPT (con gestione robusta della API key e retry)."""
+        # Validazione input
+        if not tema or not str(tema).strip():
+            raise ValueError("Tema mancante o non valido.")
+        try:
+            numero_domande = int(numero_domande)
+        except Exception:
+            raise ValueError("Numero domande non valido.")
+        if numero_domande <= 0:
+            raise ValueError("Numero domande deve essere > 0.")
 
+        # Se la key non c'è, non provare nemmeno la chiamata (evita errore OpenAI)
+        if not api_key or not str(api_key).strip():
+            raise ValueError(
+                "Generazione automatica non disponibile: API key OpenAI mancante. "
+                "Inserisci una API key valida oppure crea il quiz manualmente."
+            )
+
+        openai.api_key = str(api_key).strip()
+
+        prompt_base = f"Genera una domanda sul tema: {tema}. "
         if modalita_risposta == "3_risposte":
             prompt_base += "La domanda deve avere 3 opzioni di risposta: una corretta e due sbagliate."
         elif modalita_risposta == "4_risposte":
             prompt_base += "La domanda deve avere 4 opzioni di risposta: una corretta e tre sbagliate."
+        else:
+            # fallback sensato
+            prompt_base += "La domanda deve avere 4 opzioni di risposta: una corretta e tre sbagliate."
 
-        while len(domande) < numero_domande:
+        domande = []
+        # Evita loop infinito: mettiamo un tetto ai tentativi
+        max_attempts = max(10, numero_domande * 5)
+        attempts = 0
+
+        while len(domande) < numero_domande and attempts < max_attempts:
+            attempts += 1
             messages = [
-                {"role": "system",
-                 "content": (
-                     "Sei un assistente esperto in educazione civica italiana. Genera domande educative, coinvolgenti e "
-                     "adatte al livello delle scuole superiori. Ogni domanda deve essere chiara, affrontare temi come "
-                     "Costituzione, diritti, doveri, cittadinanza e sostenibilità, e includere opzioni di risposta."
-                 )},
-                {"role": "user", "content": prompt_base}
+                {
+                    "role": "system",
+                    "content": (
+                        "Sei un assistente esperto in educazione civica italiana. "
+                        "Genera domande educative e coinvolgenti adatte al livello delle scuole superiori. "
+                        "Formato richiesto:\n"
+                        "1) Prima riga: testo domanda\n"
+                        "2) Righe successive: A) ... B) ... C) ... (D) ...\n"
+                        "3) Ultima riga: Risposta corretta: <LETTERA>) <testo>\n"
+                    ),
+                },
+                {"role": "user", "content": prompt_base},
             ]
+
             try:
                 response = openai.ChatCompletion.create(
                     model="gpt-3.5-turbo",
                     messages=messages,
-                    max_tokens=200,
+                    max_tokens=220,
                     temperature=0.7,
                 )
-                domanda = response.choices[0].message["content"].strip()
+                domanda_txt = response.choices[0].message["content"].strip()
 
-                parsed_domanda = QuizModel.parse_domanda(domanda)
-                domande.append(parsed_domanda)
-            except ValueError as parse_error:
+                # Parsing robusto
+                parsed = QuizModel.parse_domanda(domanda_txt)
+
+                # Dedup (evita domande identiche se il modello ripete)
+                key = (parsed.get("testo_domanda", "").lower().strip())
+                if key and all(d.get("testo_domanda", "").lower().strip() != key for d in domande):
+                    domande.append(parsed)
+
+            except ValueError:
+                # parsing fallito: riprova fino a max_attempts
                 continue
             except Exception as e:
-                print(f"Errore durante la richiesta OpenAI: {e}")
+                # qualunque altro errore OpenAI: interrompi con messaggio chiaro
                 raise ValueError(f"Errore OpenAI: {e}")
+
+        if len(domande) < numero_domande:
+            raise ValueError(
+                f"Impossibile generare {numero_domande} domande valide. "
+                f"Domande generate: {len(domande)}. Riprova o crea il quiz manualmente."
+            )
+
         return domande
 
     @staticmethod

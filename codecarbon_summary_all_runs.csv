@@ -1,0 +1,7 @@
+group,run,duration_s,energy_kwh,avg_power_w,emissions_kg,file
+docente,docente_run1,65.02988689999984,0.0022036151702222,121.99028771184807,0.0007287752018655,codecarbon_runs\docente_run1\emissions.csv
+docente,docente_run2,65.04203750000033,0.0022040384864444,121.99092857753418,0.0007289152001599,codecarbon_runs\docente_run2\emissions.csv
+docente,docente_run3,65.03722400000015,0.002203869158111,121.99058448742497,0.0007288592002321,codecarbon_runs\docente_run3\emissions.csv
+studente,studente_run1,65.0319612000003,0.0022036675310555,121.98929519289607,0.0007287925185356,codecarbon_runs\studente_run1\emissions.csv
+studente,studente_run2,65.02567210000007,0.0022034817915,121.9908106017099,0.0007287310911213,codecarbon_runs\studente_run2\emissions.csv
+studente,studente_run3,65.03265550000015,0.0022037019200001,121.98989647593804,0.0007288038915786,codecarbon_runs\studente_run3\emissions.csv
