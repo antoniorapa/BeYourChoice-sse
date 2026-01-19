@@ -22,42 +22,42 @@ from app.views.materialeDocente import initialize_materiale_docente_blueprint
 from app.views.materialeStudente import initialize_materiale_studente_blueprint
 from app.views.profilo import initialize_profilo_blueprint
 
-
 logging.basicConfig(level=logging.INFO)
 
-# Crea l'applicazione Flask
 app = Flask(
     __name__,
     template_folder='app/templates',
     static_folder="public",
-    static_url_path="../public"
+    static_url_path="/public"
 )
 
-# Abilita compressione gzip/brotli
+# Compressione
 Compress(app)
+app.config["COMPRESS_ALGORITHM"] = "gzip"
+app.config["COMPRESS_LEVEL"] = 6
+app.config["COMPRESS_MIN_SIZE"] = 0
 
-
-# --- Logging tempo di risposta ---
+# Timer + Cache
 @app.before_request
 def start_timer():
     request.start_time = time.time()
 
 @app.after_request
-def log_response_time(response):
+def after_request(response):
+    # LOG tempo risposta
     duration = time.time() - request.start_time
     logging.info(f"Request to {request.path} took {duration:.2f} seconds")
-    return response
 
-
-# --- Cache per file statici ---
-@app.after_request
-def add_cache_control(response):
-    if request.path.startswith("/public/"):
+    # CACHE per statici
+    if request.path.startswith("/public/") or request.path.startswith("/static/"):
         response.headers["Cache-Control"] = "public, max-age=31536000"
+    else:
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+
     return response
 
-
-# --- Route homepage ---
 @app.route('/')
 def home():
     if 'email' not in session:
@@ -91,8 +91,7 @@ def home():
 
     return redirect(url_for('login.login'))
 
-
-# --- Blueprint ---
+# Blueprint
 app.register_blueprint(classedocente, url_prefix='/classedocente')
 app.register_blueprint(inserimentostudente, url_prefix='/inserimentostudente')
 app.register_blueprint(creazioneclasse, url_prefix='/')
@@ -103,22 +102,17 @@ app.register_blueprint(login_bp)
 app.register_blueprint(registrazione_bp)
 app.register_blueprint(quiz_blueprint)
 
-
-# --- Upload folder ---
+# Upload folder
 UPLOAD_FOLDER = 'public/uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-
-# --- Secret Key (meglio se da env) ---
+# Secret key
 app.secret_key = os.environ.get("SECRET_KEY", os.urandom(32).hex())
 
-
-# --- Blueprint aggiuntivi ---
+# Blueprint aggiuntivi
 initialize_materiale_docente_blueprint(app)
 initialize_materiale_studente_blueprint(app)
 initialize_profilo_blueprint(app)
 
-
-# --- Avvio server ---
 if __name__ == "__main__":
     app.run(debug=False)
