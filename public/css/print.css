@@ -1,0 +1,75 @@
+@page {
+    size: auto;
+    margin: 10mm;
+}
+
+@media print {
+
+    html, body {
+        background: #fff !important;
+        color: #000 !important;
+        font-family: Arial, Helvetica, sans-serif !important;
+    }
+
+    /* Nasconde elementi non necessari */
+    footer,
+    nav,
+    .sidebar,
+    .menu,
+    .toast,
+    .toast-container,
+    .btn,
+    button,
+    input,
+    select,
+    textarea {
+        display: none !important;
+    }
+
+    /* Mantieni visibile il logo */
+    .logo img {
+        display: block !important;
+    }
+
+    /* Mantieni visibile SOLO il contenuto principale */
+    .main-content,
+    .content,
+    #main,
+    #content,
+    .page-content {
+        display: block !important;
+    }
+
+    /* Ottimizza testo e spazi */
+    * {
+        box-shadow: none !important;
+        text-shadow: none !important;
+        background: transparent !important;
+        color: #000 !important;
+    }
+
+    /* Tabella stampa pulita */
+    table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        font-size: 12px !important;
+    }
+
+    th, td {
+        border: 1px solid #000 !important;
+        padding: 6px !important;
+    }
+
+    a::after {
+        content: "";
+    }
+
+    .break-page {
+        page-break-before: always;
+    }
+
+    body {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+}

@@ -4,19 +4,19 @@
     <meta charset="UTF-8">
     <title>Creazione scenario virtuale</title>
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styleScenarioVirtuale.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styleScenarioVirtuale.min.css') }}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='img/favicon-32x32.png') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.js"></script>
 </head>
 <body>
     {% include 'header.html' %}
     <div class="main-content">
         <!-- ScenarioVirtuale principale -->
         <div class="scenario" >
-            <img src="{{ url_for('static', filename='img/achie.png') }}"  class="img1">
+            <img src="{{ url_for('static', filename='img/achie.png') }}"  class="img1" width="600" height="600">
             <button class="button_1" type="submit" ><a href="{{ url_for('classedocente.manutenzione') }}">ACHIEVEMENT</a></button> <!-- show error da fare post mergee -->
             <h2>Creazione scenario virtuale</h2>
               <form id="formScenario" action="/scenarioVirtuale" method="POST">

@@ -5,15 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Header</title>
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styleHeader.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styleHeader.min.css') }}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/\2.min.css') }}" media="print">
 </head>
 <body>
     <header class="main-header">
         <div class="container">
             <div class="logo">
                 <a href="{{url_for('classedocente.logo_action')}}">
-                    <img src="{{ url_for('static', filename='img/Logo.png') }}" width="20%" >
+                    <img src="{{ url_for('static', filename='img/Logo.png') }}" alt="Logo" class="logo-img" width="90" height="90">
                 </a>
             </div>
             <nav class="navigation">
