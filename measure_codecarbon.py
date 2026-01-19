@@ -1,3 +1,4 @@
+""""
 import argparse
 import os
 import signal
@@ -97,3 +98,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     run_measurement(args.label, args.seconds, args.output_dir)
+"""

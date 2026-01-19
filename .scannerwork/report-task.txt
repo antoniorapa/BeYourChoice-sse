@@ -2,5 +2,5 @@ projectKey=BeYourChoice-sse
 serverUrl=http://localhost:9000
 serverVersion=26.1.0.118079
 dashboardUrl=http://localhost:9000/dashboard?id=BeYourChoice-sse
-ceTaskId=65954773-fbf9-4c90-8fab-e09ba7caecbb
-ceTaskUrl=http://localhost:9000/api/ce/task?id=65954773-fbf9-4c90-8fab-e09ba7caecbb
+ceTaskId=f20863b3-572c-4524-8d44-4806cbdb0421
+ceTaskUrl=http://localhost:9000/api/ce/task?id=f20863b3-572c-4524-8d44-4806cbdb0421

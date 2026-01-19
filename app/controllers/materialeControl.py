@@ -1,166 +1,109 @@
-"""
-materialeControl.py
-
-Questo modulo gestisce le operazioni sui materiali didattici, inclusi
-il caricamento, la modifica, la visualizzazione e la rimozione. Si
-interfaccia con il database e gestisce i file presenti nel filesystem.
-
-Autore: [il tuo nome]
-Data di creazione: [data di creazione]
-"""
-
-
 import os
 import re
-from bson import ObjectId
-from flask import flash, redirect, url_for, send_file, abort, session
-from app.models.materialeModel import MaterialeModel
 import uuid
+from bson import ObjectId
+from flask import flash, redirect, url_for, send_file, abort, session , request
+from app.models.materialeModel import MaterialeModel
 
 MAX_FILE_SIZE_MB = 2
 ALLOWED_EXTENSIONS = {'docx', 'pdf', 'jpeg', 'png', 'txt', 'jpg', 'mp4'}
 
+TITOLO_RE = re.compile(r'^[A-Za-z0-9 ]{2,20}$')
+DESCRIZIONE_RE = re.compile(r'^[^§]{2,255}$')
+
 
 class MaterialeControl:
-
-    """
-    Classe che gestisce i materiali didattici.
-
-    Fornisce metodi per gestire l'interazione con il database e il sistema di file
-    per le operazioni di creazione, lettura, aggiornamento e cancellazione.
-    """
-
-    def __init__(self, db_manager):
-
-        """
-       Inizializza un'istanza di MaterialeControl.
-
-       :param db_manager: Gestore del database per le operazioni sui materiali.
-       """
-
+    def __init__(self, db_manager,cartella_uploads=None):
         self.control = MaterialeModel(db_manager)
-        self.cartella_uploads = None
+        self.cartella_uploads = cartella_uploads
 
     def set_cartella_uploads(self, path_cartella):
-        """
-       Imposta la cartella di destinazione per i file caricati.
-
-       :param path_cartella: Percorso della cartella.
-       """
         self.cartella_uploads = path_cartella
 
     def titolo_valido(self, titolo):
-        """
-        Verifica la validità del titolo.
-
-        :param titolo: Il titolo da verificare.
-        :return: True se il titolo è valido, altrimenti False.
-        """
-        return bool(re.match(r'^[A-Za-z0-9 ]{2,20}$', titolo))
+        return bool(TITOLO_RE.match(titolo or ""))
 
     def descrizione_valida(self, descrizione):
-        """
-        Verifica la validità della descrizione.
-
-        :param descrizione: La descrizione da verificare.
-        :return: True se la descrizione è valida, altrimenti False.
-        """
-        return bool(re.match(r'^[^§]{2,255}$', descrizione))
+        return bool(DESCRIZIONE_RE.match(descrizione or ""))
 
     def tipo_file_valido(self, nome_file):
-        """
-       Verifica la validità del tipo di file.
+        if not nome_file or '.' not in nome_file:
+            return False
+        return nome_file.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-       :param nome_file: Nome del file.
-       :return: True se il tipo di file è consentito, altrimenti False.
-       """
-        return '.' in nome_file and nome_file.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    def grandezza_file_valida(self, file):
+        # content_length può essere None in alcuni casi: gestiamo
+        size = getattr(file, "content_length", None)
+        if size is None:
+            return True  # fallback: non blocchiamo, ma potresti volerlo rendere False
+        return size <= MAX_FILE_SIZE_MB * 1024 * 1024
 
-    def grandezza_file_valido(self, file):
-        """
-        Verifica la dimensione del file.
-
-        :param file: Oggetto file da verificare.
-        :return: True se la dimensione è nei limiti, altrimenti False.
-        """
-        return file.content_length <= MAX_FILE_SIZE_MB * 1024 * 1024
+    def _require_upload_folder(self):
+        if not self.cartella_uploads:
+            raise RuntimeError("Cartella uploads non configurata")
+        os.makedirs(self.cartella_uploads, exist_ok=True)
 
     def carica_materiale(self, request):
-
-        """ Gestisce il caricamento del materiale didattico.
-        :param request: Oggetto di richiesta HTTP contenente i dati di caricamento.
-        :return: Redirect alla pagina di visualizzazione del docente.
-        """
-
-        titolo = request.form['titolo']
-        descrizione = request.form['descrizione']
-        tipo = request.form['tipo']
-        file = request.files['file']
+        titolo = request.form.get('titolo', '')
+        descrizione = request.form.get('descrizione', '')
+        tipo = request.form.get('tipo', '')
+        file = request.files.get('file')
         id_classe = session.get('id_classe')
 
+        if not file:
+            flash("File mancante.", "error")
+            return redirect(request.url)
+
         if not self.titolo_valido(titolo):
-            flash("Il titolo non è valido. Deve essere tra 2 e 20 caratteri e contenere solo lettere e numeri.",
-                  "error")
+            flash("Titolo non valido (2-20, solo lettere/numeri/spazi).", "error")
             return redirect(request.url)
 
         if not self.descrizione_valida(descrizione):
-            flash("La descrizione deve avere una lunghezza tra i 2 e i 255 caratteri.", "error")
+            flash("Descrizione non valida (2-255).", "error")
             return redirect(request.url)
 
         if not self.tipo_file_valido(file.filename):
-            flash("Il tipo di file non è valido. Ammessi: docx, pdf, jpeg, png, txt, jpg, mp4.", "error")
+            flash("Tipo file non valido.", "error")
             return redirect(request.url)
 
         file_extension = file.filename.rsplit('.', 1)[1].lower()
         if tipo != file_extension:
-            flash("Il tipo di file selezionato non corrisponde all'estensione del file. Seleziona il tipo corretto.",
-                  "error")
+            flash("Tipo selezionato non corrisponde all'estensione.", "error")
             return redirect(request.url)
 
-        if not self.grandezza_file_valido(file):
-            flash(f"La dimensione del file non deve superare i {MAX_FILE_SIZE_MB} MB.", "error")
+        if not self.grandezza_file_valida(file):
+            flash(f"File troppo grande (max {MAX_FILE_SIZE_MB} MB).", "error")
             return redirect(request.url)
 
-        # Ottieni il percorso completo e crea la directory se non esiste
-        if not os.path.exists(self.cartella_uploads):
-            os.makedirs(self.cartella_uploads)
+        self._require_upload_folder()
 
-        filepath = file.filename
-        file.save(os.path.join(self.cartella_uploads, filepath))
-
-        id_materiale_didattico = uuid.uuid4().hex
+        # nome file “safe”: manteniamo solo basename
+        safe_name = os.path.basename(file.filename)
+        file.save(os.path.join(self.cartella_uploads, safe_name))
 
         nuovo_materiale = {
-            "id_materiale": id_materiale_didattico,
+            "id_materiale": uuid.uuid4().hex,
             "titolo": titolo,
             "descrizione": descrizione,
-            "file_path": filepath,
+            "file_path": safe_name,
             "tipo": tipo,
             "id_classe": id_classe
         }
         self.control.carica_materiali(nuovo_materiale)
+
         flash("Materiale caricato con successo!", "materiale_success")
         return redirect(url_for('MaterialeDocente.visualizza_materiale_docente'))
 
     def modifica_materiale(self, id_materiale, request):
-        """
-       Modifica un materiale esistente nel database.
-
-       :param id_materiale: ID del materiale da modificare.
-       :param request: Oggetto della richiesta HTTP con i dati aggiornati.
-       :return: Redirect alla pagina di visualizzazione del docente.
-       """
         try:
             id_materiale_obj = ObjectId(id_materiale)
         except Exception:
-            flash("ID del materiale non valido.", "error")
-            print("Debug: ID del materiale non valido.")
+            flash("ID materiale non valido.", "error")
             return redirect(url_for('MaterialeDocente.visualizza_materiale_docente'))
 
         materiale = self.control.get_materiale_tramite_id(id_materiale_obj)
         if materiale is None:
-            flash("Errore: Materiale non trovato.", "error")
-            print(f"Debug: Nessun materiale trovato con ID: {id_materiale_obj}")
+            flash("Materiale non trovato.", "error")
             return redirect(url_for('MaterialeDocente.visualizza_materiale_docente'))
 
         if request.method == 'POST':
@@ -168,27 +111,27 @@ class MaterialeControl:
             descrizione = request.form.get('descrizione', '')
 
             if not self.titolo_valido(titolo):
-                flash("Il titolo non è valido. Deve essere tra 2 e 20 caratteri e contenere solo lettere e numeri.",
-                      "error")
+                flash("Titolo non valido.", "error")
                 return redirect(request.url)
 
             if not self.descrizione_valida(descrizione):
-                flash("La descrizione deve avere una lunghezza tra i 2 e i 255 caratteri.", "error")
+                flash("Descrizione non valida.", "error")
                 return redirect(request.url)
 
-            file = request.files.get('file', None)
-            if file:
+            file = request.files.get('file')
+            if file and file.filename:
                 if not self.tipo_file_valido(file.filename):
-                    flash("Il tipo di file non è valido. Ammessi: docx, pdf, jpeg, png, txt, jpg, mp4.", "error")
+                    flash("Tipo file non valido.", "error")
                     return redirect(request.url)
 
-                if not self.grandezza_file_valido(file):
-                    flash(f"La dimensione del file non deve superare i {MAX_FILE_SIZE_MB} MB.", "error")
+                if not self.grandezza_file_valida(file):
+                    flash(f"File troppo grande (max {MAX_FILE_SIZE_MB} MB).", "error")
                     return redirect(request.url)
 
-                filepath = file.filename
-                file.save(os.path.join(self.cartella_uploads, filepath))
-                materiale['file_path'] = filepath
+                self._require_upload_folder()
+                safe_name = os.path.basename(file.filename)
+                file.save(os.path.join(self.cartella_uploads, safe_name))
+                materiale['file_path'] = safe_name
 
             dati_caricati = {
                 "titolo": titolo,
@@ -196,71 +139,48 @@ class MaterialeControl:
                 "file_path": materiale.get('file_path')
             }
 
-            print(f"Debug: Modifica del materiale con ID: {id_materiale_obj} con i dati aggiornati: {dati_caricati}")
             self.control.modifica_materiale(id_materiale_obj, dati_caricati)
             flash("Materiale modificato con successo!", "materiale_success")
-            print("Debug: Materiale modificato con successo.")
             return redirect(url_for('MaterialeDocente.visualizza_materiale_docente'))
 
     def rimuovi_materiale(self, id_materiale):
-        """
-        Rimuove un materiale didattico dal database e dal filesystem dove possibile.
-
-        :param id_materiale: ID del materiale da rimuovere.
-        :return: Redirect alla pagina di visualizzazione del docente.
-        """
         try:
             id_materiale_obj = ObjectId(id_materiale)
         except Exception as e:
-            flash("ID del materiale non valido: " + str(e), "error")
+            flash(f"ID non valido: {e}", "error")
             return redirect(url_for('MaterialeDocente.visualizza_materiale_docente'))
 
         materiale = self.control.visualizza_materiale({"_id": id_materiale_obj})
-
         if materiale is None:
             flash("Materiale non trovato.", "error")
             return redirect(url_for('MaterialeDocente.visualizza_materiale_docente'))
 
-        # Prova ad eliminare il materiale
-        successo_rimozione = self.control.elimina_materiale(id_materiale_obj)
-
-        if not successo_rimozione:
-            flash("Errore durante la rimozione del materiale dal database.", "error")
+        if not self.control.elimina_materiale(id_materiale_obj):
+            flash("Errore rimozione dal DB.", "error")
             return redirect(url_for('MaterialeDocente.visualizza_materiale_docente'))
 
         file_path = materiale.get('file_path')
-        if file_path:
-            full_file_path = os.path.join(self.cartella_uploads, file_path)
-            if os.path.exists(full_file_path):
+        if file_path and self.cartella_uploads:
+            full_path = os.path.join(self.cartella_uploads, file_path)
+            if os.path.exists(full_path):
                 try:
-                    os.remove(full_file_path)
-                    flash("Materiale rimosso con successo!", "materiale_success")
+                    os.remove(full_path)
                 except OSError as e:
-                    flash(f"Errore durante l'eliminazione del file: {e}", "error")
-            else:
-                flash("File non trovato, ma materiale rimosso dal database.", "warning")
+                    flash(f"Errore eliminazione file: {e}", "error")
 
+        flash("Materiale rimosso con successo!", "materiale_success")
         return redirect(url_for('MaterialeDocente.visualizza_materiale_docente'))
 
     def visualizza_materiali(self, id_classe):
-        """
-        Visualizza i materiali di una classe specifica.
-
-        :param id_classe: ID della classe di cui recuperare i materiali.
-        :return: Lista di materiali.
-        """
-        materiali = self.control.get_materiali_tramite_id_classe(id_classe)
-        return materiali
+        return self.control.get_materiali_tramite_id_classe(id_classe)
 
     def servi_file(self, nome_file):
-        """
-        Serve un file su richiesta.
+        if not self.cartella_uploads:
+            abort(500)
 
-        :param nome_file: Nome del file da servire.
-        :return: Risposta con il file da inviato o un errore 404 se non trovato.
-        """
-        file_path = os.path.join(self.cartella_uploads, nome_file)
+        safe_name = os.path.basename(nome_file)
+        file_path = os.path.join(self.cartella_uploads, safe_name)
+
         if os.path.exists(file_path):
             return send_file(file_path)
-        else:
-            abort(404)
+        abort(404)

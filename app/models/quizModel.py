@@ -5,10 +5,8 @@ from flask import session
 from databaseManager import DatabaseManager
 
 
-
-
 class QuizModel:
-
+    # ok: DatabaseManager è singleton nel tuo progetto
     db_manager = DatabaseManager(db_name="BeYourChoice;")
 
     @staticmethod
@@ -23,12 +21,17 @@ class QuizModel:
             testo_domanda = domanda_lines[0].strip()
 
             opzioni_risposte = [
-                line.strip() for line in domanda_lines[1:] if line.startswith(("A)", "B)", "C)", "D)"))
+                line.strip()
+                for line in domanda_lines[1:]
+                if line.startswith(("A)", "B)", "C)", "D)"))
             ]
 
             risposta_corretta = next(
-                (line.replace("Risposta corretta:", "").strip() for line in domanda_lines if
-                 "Risposta corretta:" in line),
+                (
+                    line.replace("Risposta corretta:", "").strip()
+                    for line in domanda_lines
+                    if "Risposta corretta:" in line
+                ),
                 None
             )
 
@@ -51,7 +54,6 @@ class QuizModel:
     @staticmethod
     def genera_domande(tema, numero_domande, modalita_risposta, api_key):
         """Genera domande utilizzando OpenAI GPT (con gestione robusta della API key e retry)."""
-        # Validazione input
         if not tema or not str(tema).strip():
             raise ValueError("Tema mancante o non valido.")
         try:
@@ -61,7 +63,6 @@ class QuizModel:
         if numero_domande <= 0:
             raise ValueError("Numero domande deve essere > 0.")
 
-        # Se la key non c'è, non provare nemmeno la chiamata (evita errore OpenAI)
         if not api_key or not str(api_key).strip():
             raise ValueError(
                 "Generazione automatica non disponibile: API key OpenAI mancante. "
@@ -70,17 +71,18 @@ class QuizModel:
 
         openai.api_key = str(api_key).strip()
 
-        prompt_base = f"Genera una domanda sul tema: {tema}. "
-        if modalita_risposta == "3_risposte":
-            prompt_base += "La domanda deve avere 3 opzioni di risposta: una corretta e due sbagliate."
-        elif modalita_risposta == "4_risposte":
-            prompt_base += "La domanda deve avere 4 opzioni di risposta: una corretta e tre sbagliate."
-        else:
-            # fallback sensato
-            prompt_base += "La domanda deve avere 4 opzioni di risposta: una corretta e tre sbagliate."
+        # ✅ evita concatenazioni con += (anche se qui non è in loop, è più pulito)
+        suffix_by_mode = {
+            "3_risposte": "La domanda deve avere 3 opzioni di risposta: una corretta e due sbagliate.",
+            "4_risposte": "La domanda deve avere 4 opzioni di risposta: una corretta e tre sbagliate.",
+        }
+        suffix = suffix_by_mode.get(
+            modalita_risposta,
+            "La domanda deve avere 4 opzioni di risposta: una corretta e tre sbagliate."
+        )
+        prompt_base = f"Genera una domanda sul tema: {tema}. {suffix}"
 
         domande = []
-        # Evita loop infinito: mettiamo un tetto ai tentativi
         max_attempts = max(10, numero_domande * 5)
         attempts = 0
 
@@ -110,19 +112,15 @@ class QuizModel:
                 )
                 domanda_txt = response.choices[0].message["content"].strip()
 
-                # Parsing robusto
                 parsed = QuizModel.parse_domanda(domanda_txt)
 
-                # Dedup (evita domande identiche se il modello ripete)
                 key = (parsed.get("testo_domanda", "").lower().strip())
                 if key and all(d.get("testo_domanda", "").lower().strip() != key for d in domande):
                     domande.append(parsed)
 
             except ValueError:
-                # parsing fallito: riprova fino a max_attempts
                 continue
             except Exception as e:
-                # qualunque altro errore OpenAI: interrompi con messaggio chiaro
                 raise ValueError(f"Errore OpenAI: {e}")
 
         if len(domande) < numero_domande:
@@ -140,15 +138,18 @@ class QuizModel:
             quiz_collection = QuizModel.db_manager.get_collection("Quiz")
             questions_collection = QuizModel.db_manager.get_collection("Domanda")
 
-            # Genera un ID numerico decimale basato sull'ultimo ID nel database
             ultimo_quiz = quiz_collection.find_one(sort=[("id_quiz", -1)])
             nuovo_id = float(ultimo_quiz["id_quiz"] + 1) if ultimo_quiz else 1.0
 
-            id_classe = session.get("id_classe")
-            if not id_classe:
-                raise ValueError("ID Classe mancante nella sessione.")
+            # ✅ id_classe: normalizza a int (coerenza DB)
+            id_classe = data.get("id_classe") or session.get("id_classe")
+            if id_classe is None:
+                raise ValueError("ID Classe mancante (data o sessione).")
+            try:
+                id_classe = int(id_classe)
+            except Exception:
+                raise ValueError("ID Classe non valido (non convertibile in int).")
 
-            # Prepara il documento del quiz
             quiz = {
                 "id_quiz": nuovo_id,
                 "titolo": data["titolo"],
@@ -161,10 +162,8 @@ class QuizModel:
                 "id_classe": id_classe
             }
 
-            # Inserisci il quiz nel database
             quiz_collection.insert_one(quiz)
 
-            # Inserisci ogni domanda associata al quiz
             for domanda in data["domande"]:
                 risposta_corretta = domanda["risposta_corretta"].split(")", 1)[-1].strip()
                 question = {
@@ -172,7 +171,7 @@ class QuizModel:
                     "testo_domanda": domanda["testo_domanda"],
                     "opzioni_risposte": domanda["opzioni_risposte"],
                     "risposta_corretta": risposta_corretta,
-                    "id_quiz": nuovo_id  # Associa l'ID del quiz
+                    "id_quiz": nuovo_id
                 }
                 questions_collection.insert_one(question)
         except Exception as e:
@@ -184,10 +183,10 @@ class QuizModel:
         try:
             questions_collection = QuizModel.db_manager.get_collection("Domanda")
             domande = list(questions_collection.find({"id_domanda": {"$in": lista_id_domande}}))
-            # Verifica che le opzioni di risposta siano presenti
+
             for domanda in domande:
-                if "opzioni_risposta" not in domanda:
-                    domanda["opzioni_risposta"] = []  # Fallback per evitare errori
+                if "opzioni_risposta" not in domanda and "opzioni_risposte" not in domanda:
+                    domanda["opzioni_risposte"] = []
             return domande
         except Exception as e:
             raise ValueError(f"Errore durante il recupero delle domande: {e}")
@@ -206,17 +205,29 @@ class QuizModel:
 
     @staticmethod
     def recupera_quiz_per_classe(id_classe):
-        """Recupera tutti i quiz per una classe specifica."""
+        """
+        ✅ FIX PRINCIPALE:
+        Recupera tutti i quiz per una classe anche se nel DB hai legacy con id_classe salvato come str.
+        """
         try:
             quiz_collection = QuizModel.db_manager.get_collection("Quiz")
 
-            # Debug per verificare id_classe
-            print(f"DEBUG: id_classe = {id_classe}, tipo = {type(id_classe)}")
+            # normalizza a int + mantiene anche la versione stringa per compatibilità
+            try:
+                id_classe_int = int(id_classe)
+            except Exception:
+                id_classe_int = None
 
-            # Effettua la query
-            quiz_list = list(quiz_collection.find({"id_classe": id_classe}))
+            id_classe_str = str(id_classe) if id_classe is not None else None
 
-            # Converti _id in stringa per compatibilità
+            candidate_ids = []
+            if id_classe_int is not None:
+                candidate_ids.append(id_classe_int)
+            if id_classe_str:
+                candidate_ids.append(id_classe_str)
+
+            quiz_list = list(quiz_collection.find({"id_classe": {"$in": candidate_ids}}))
+
             for quiz in quiz_list:
                 if "_id" in quiz:
                     quiz["_id"] = str(quiz["_id"])
@@ -271,8 +282,6 @@ class QuizModel:
     def recupera_attività_completate(titolo_quiz):
         """
         Recupera le attività completate per un determinato quiz basandosi sul titolo del quiz.
-        :param titolo_quiz: Titolo del quiz
-        :return: Lista di attività completate
         """
         try:
             dashboard_collection = QuizModel.db_manager.get_collection("Dashboard")
@@ -284,80 +293,59 @@ class QuizModel:
 
     @staticmethod
     def calcola_tempo_rimanente(quiz_id, cf_studente):
-        """
-        Calcola il tempo rimanente per un quiz specifico.
-        """
+        """Calcola il tempo rimanente per un quiz specifico."""
         quiz_collection = QuizModel.db_manager.get_collection("Quiz")
 
-        # Recupera l'ora di inizio dal database o impostala
         sessione = quiz_collection.find_one({"id_quiz": quiz_id, "cf_studente": cf_studente})
         ora_attuale = datetime.utcnow()
 
         if not sessione:
-            # Se la sessione non esiste, creala
             ora_inizio = ora_attuale
         else:
-            ora_inizio = sessione["Ora_Inizio"]
+            ora_inizio = sessione.get("Ora_Inizio", ora_attuale)
 
-        # Recupera la durata del quiz
         quiz = quiz_collection.find_one({"id_quiz": quiz_id})
-        durata_quiz = quiz["durata"] if quiz else 30  # Default a 30 minuti
+        durata_quiz = quiz.get("durata", 30) if quiz else 30
 
-        # Calcola il tempo rimanente in secondi
         fine_quiz = ora_inizio + timedelta(minutes=durata_quiz)
         tempo_rimanente = max(0, int((fine_quiz - ora_attuale).total_seconds()))
-
         return tempo_rimanente
 
     @staticmethod
     def salva_risultato_quiz(risultato_quiz, cf_studente, punteggio):
-        """
-        Salva il risultato del quiz nel database e registra l'attività nella dashboard.
-        :param quiz_result: Dati del risultato del quiz da salvare.
-        :param cf_studente: Codice fiscale dello studente.
-        :param punteggio: Punteggio ottenuto dallo studente.
-        """
+        """Salva il risultato del quiz nel database e registra l'attività nella dashboard."""
         try:
-            # Collezioni necessarie
             quiz_results_collection = QuizModel.db_manager.get_collection("RisultatoQuiz")
             attività_collection = QuizModel.db_manager.get_collection("Dashboard")
             quiz_collection = QuizModel.db_manager.get_collection("Quiz")
 
-            # Salva il risultato del quiz
             quiz_results_collection.insert_one(risultato_quiz)
 
-            # Recupera il titolo del quiz
             quiz = quiz_collection.find_one({"id_quiz": risultato_quiz["id_quiz"]}, {"titolo": 1})
             if not quiz:
                 raise ValueError(f"Quiz con ID {risultato_quiz['id_quiz']} non trovato.")
             titolo_quiz = quiz["titolo"]
 
-            # Genera l'attività svolta
             attività = {
-                "id_attivita": attività_collection.count_documents({}) + 1,  # Genera un ID incrementale
+                "id_attivita": attività_collection.count_documents({}) + 1,
                 "data_attivita": datetime.utcnow(),
                 "descrizione_attivita": f"Completamento Quiz: {titolo_quiz}",
                 "punteggio_attivita": punteggio,
                 "cf_studente": cf_studente
             }
 
-            # Inserisce l'attività nella dashboard
             attività_collection.insert_one(attività)
-            print(f"DEBUG: Risultato del quiz e attività salvati correttamente per lo studente {cf_studente}")
         except Exception as e:
             raise ValueError(f"Errore durante il salvataggio del risultato: {e}")
 
     @staticmethod
     def verifica_completamento_quiz(quiz_id, cf_studente):
-        """
-        Verifica se uno studente ha già completato un quiz specifico.
-        """
+        """Verifica se uno studente ha già completato un quiz specifico."""
         try:
             risultati_collection = QuizModel.db_manager.get_collection("RisultatoQuiz")
             risultato = risultati_collection.find_one({"id_quiz": quiz_id, "cf_studente": cf_studente})
-            return risultato is not None  # Restituisce True se il quiz è completato
-        except Exception as e:
-            print(f"ERRORE durante la verifica del completamento del quiz: {e}")
+            return risultato is not None
+        except Exception:
             return False
 
     @staticmethod
@@ -365,8 +353,6 @@ class QuizModel:
         """Verifica se il titolo del quiz esiste già nel database."""
         try:
             quiz_collection = QuizModel.db_manager.get_collection("Quiz")
-            # Cerca un documento con il titolo specificato
             return quiz_collection.find_one({"titolo": titolo}) is not None
         except Exception as e:
             raise ValueError(f"Errore durante la verifica del titolo: {e}")
-

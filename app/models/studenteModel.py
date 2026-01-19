@@ -1,30 +1,36 @@
-from databaseManager import DatabaseManager  # Importa la classe DatabaseManager
+# app/models/studenteModel.py
+import logging
 import bcrypt
+from databaseManager import DatabaseManager
+
+logger = logging.getLogger(__name__)
 
 
 class StudenteModel:
-    def __init__(self):
-        # Utilizza la connessione esistente al database
-        self.db_manager = DatabaseManager()
+    def __init__(self, db_manager=None):
+        self.db_manager = db_manager or DatabaseManager()
 
-    def aggiungi_studente(self, studente_dict):
+    def aggiungi_studente(self, studente_dict: dict):
         studente_collection = self.db_manager.get_collection("Studente")
-        # Cifra la password prima di salvarla
-        hash = bcrypt.hashpw(studente_dict['password'].encode('utf-8'), bcrypt.gensalt())
-        studente_dict['password'] = hash
+
+        # cifra password
+        raw_pw = studente_dict.get("password", "")
+        studente_dict["password"] = bcrypt.hashpw(raw_pw.encode("utf-8"), bcrypt.gensalt())
+
         studente_collection.insert_one(studente_dict)
-        print("Studente aggiunto con successo!")
 
-    def trova_studente(self, email):
-        # Cerca uno studente per email
+    def trova_studente(self, email: str):
+        """
+        Restituisce documento studente per email.
+        Nota: qui serve anche la password (login), quindi niente projection.
+        """
         studente_collection = self.db_manager.get_collection("Studente")
-        print(studente_collection.find_one({"email": email}))
         return studente_collection.find_one({"email": email})
 
-    def trova_cf_per_email(self, email):
-        # Cerca lo studente tramite email e restituisce il codice fiscale
-        studente = self.trova_studente(
-            email)  # Usa la function che hai già definito per trovare lo studente tramite email
-        if studente:
-            return studente.get("cf")  # Restituisce il codice fiscale (cf) se esiste
-        return None  # Se lo studente non viene trovato o non ha il codice fiscale
+    def trova_cf_per_email(self, email: str):
+        """
+        Ottimizzato: prende solo cf.
+        """
+        studente_collection = self.db_manager.get_collection("Studente")
+        doc = studente_collection.find_one({"email": email}, {"_id": 0, "cf": 1})
+        return doc.get("cf") if doc else None

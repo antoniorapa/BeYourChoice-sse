@@ -1,152 +1,182 @@
+# app/models/attivitaModel.py
 from datetime import datetime
+import logging
 from databaseManager import DatabaseManager
+
+logger = logging.getLogger(__name__)
 
 
 class Attivita:
     """
-    La classe Attivita gestisce le operazioni relative alle attività degli utenti.
+    Gestisce operazioni relative alle attività/punteggi degli utenti.
     """
-    db_manager = DatabaseManager()
 
-    def get_classifica_classe(self, id_classe):
+    def __init__(self, db_manager=None):
+        # evita variabili di classe (init a import-time) e facilita test
+        self.db_manager = db_manager or DatabaseManager()
+
+    def get_classifica_classe(self, id_classe: int):
         """
-        Recupera la classifica della classe con i punteggi totali.
+        Recupera classifica della classe con punteggio totale (scenario + quiz).
+        Ottimizzato: filtra su soli studenti della classe.
         """
         try:
-            studente_collection = self.db_manager.get_collection("Studente")
-            scenario_collection = self.db_manager.get_collection("PunteggioScenario")
-            quiz_collection = self.db_manager.get_collection("RisultatoQuiz")
+            studente_col = self.db_manager.get_collection("Studente")
+            scenario_col = self.db_manager.get_collection("PunteggioScenario")
+            quiz_col = self.db_manager.get_collection("RisultatoQuiz")
 
-            studenti = list(
-                studente_collection.find({"id_classe": id_classe}, {"_id": 0, "cf": 1, "nome": 1, "cognome": 1}))
-            punteggi_totali = {studente["cf"]: {"punteggio_scenario": 0, "punteggio_quiz": 0} for studente in studenti}
+            # prendo solo i campi necessari
+            studenti = list(studente_col.find(
+                {"id_classe": id_classe},
+                {"_id": 0, "cf": 1, "nome": 1, "cognome": 1}
+            ))
+            if not studenti:
+                return []
 
-            scenari_punteggi = scenario_collection.aggregate([
-                {"$group": {"_id": "$cf_studente", "punteggio_scenario": {"$sum": "$punteggio_scenario"}}}
+            cf_studenti = [s["cf"] for s in studenti if s.get("cf")]
+            if not cf_studenti:
+                return []
+
+            punteggi_totali = {cf: {"punteggio_scenario": 0, "punteggio_quiz": 0} for cf in cf_studenti}
+
+            # Somma scenari SOLO per CF della classe
+            scenari_punteggi = scenario_col.aggregate([
+                {"$match": {"CF_Studente": {"$in": cf_studenti}}},
+                {"$group": {"_id": "$CF_Studente", "punteggio_scenario": {"$sum": "$Punteggio_Scenario"}}},
             ])
             for item in scenari_punteggi:
-                if item["_id"] in punteggi_totali:
-                    punteggi_totali[item["_id"]]["punteggio_scenario"] = item["punteggio_scenario"]
+                cf = item["_id"]
+                if cf in punteggi_totali:
+                    punteggi_totali[cf]["punteggio_scenario"] = item.get("punteggio_scenario", 0)
 
-            quiz_punteggi = quiz_collection.aggregate([
-                {"$group": {"_id": "$cf_studente", "punteggio_quiz": {"$sum": "$punteggio_quiz"}}}
+            # Somma quiz SOLO per CF della classe
+            quiz_punteggi = quiz_col.aggregate([
+                {"$match": {"cf_studente": {"$in": cf_studenti}}},
+                {"$group": {"_id": "$cf_studente", "punteggio_quiz": {"$sum": "$punteggio_quiz"}}},
             ])
             for item in quiz_punteggi:
-                if item["_id"] in punteggi_totali:
-                    punteggi_totali[item["_id"]]["punteggio_quiz"] = item["punteggio_quiz"]
+                cf = item["_id"]
+                if cf in punteggi_totali:
+                    punteggi_totali[cf]["punteggio_quiz"] = item.get("punteggio_quiz", 0)
 
+            # costruisco output
             classifica = []
-            for studente in studenti:
-                cf_studente = studente["cf"]
-                punteggio_scenario = punteggi_totali.get(cf_studente, {}).get("punteggio_scenario", 0)
-                punteggio_quiz = punteggi_totali.get(cf_studente, {}).get("punteggio_quiz", 0)
-                punteggio_totale = punteggio_scenario + punteggio_quiz
-
+            for s in studenti:
+                cf = s["cf"]
+                p_s = punteggi_totali.get(cf, {}).get("punteggio_scenario", 0)
+                p_q = punteggi_totali.get(cf, {}).get("punteggio_quiz", 0)
                 classifica.append({
-                    "cf": cf_studente,
-                    "nome": studente["nome"],
-                    "cognome": studente["cognome"],
-                    "punteggio_totale": punteggio_totale
+                    "cf": cf,
+                    "nome": s.get("nome", ""),
+                    "cognome": s.get("cognome", ""),
+                    "punteggio_totale": p_s + p_q
                 })
 
             classifica.sort(key=lambda x: x["punteggio_totale"], reverse=True)
             return classifica
+
         except Exception as e:
-            print(f"Errore nel recupero della classifica: {e}")
+            logger.exception("Errore nel recupero classifica: %s", e)
             return []
 
-    def get_punteggio_personale(self, cf_studente):
+    def get_punteggio_personale(self, cf_studente: str):
+        """
+        Recupera punteggio personale (quiz + scenari) per studente.
+        Fix: non consumare il cursore con list() di debug.
+        """
         try:
-            scenario_collection = self.db_manager.get_collection("PunteggioScenario")
-            quiz_collection = self.db_manager.get_collection("RisultatoQuiz")
+            scenario_col = self.db_manager.get_collection("PunteggioScenario")
+            quiz_col = self.db_manager.get_collection("RisultatoQuiz")
 
-            print(f"DEBUG: Recupero punteggio per lo studente {cf_studente}")
-
-            scenario_result = scenario_collection.aggregate([
+            scenario_cursor = scenario_col.aggregate([
                 {"$match": {"CF_Studente": cf_studente}},
                 {"$group": {"_id": "$CF_Studente", "PunteggioScenari": {"$sum": "$Punteggio_Scenario"}}}
             ])
-            print(f"DEBUG: Risultato scenari: {list(scenario_result)}")
+            scenario_doc = next(scenario_cursor, None)
+            punteggio_scenari = scenario_doc.get("PunteggioScenari", 0) if scenario_doc else 0
 
-            quiz_result = quiz_collection.aggregate([
-                {"$match": {"cf_studente": cf_studente}},  # Filtra per studente
-                {"$group": {"_id": "$cf_studente", "punteggio_quiz": {"$sum": "$punteggio_quiz"}}}  # Somma i punteggi
+            quiz_cursor = quiz_col.aggregate([
+                {"$match": {"cf_studente": cf_studente}},
+                {"$group": {"_id": "$cf_studente", "punteggio_quiz": {"$sum": "$punteggio_quiz"}}}
             ])
-            punteggio_quiz = next(quiz_result, {}).get("punteggio_quiz", 0)  # Ottieni il valore o 0
-
-            print(f"DEBUG: Risultato quiz: {list(quiz_result)}")
-
-            punteggio_scenari = next(scenario_result, {}).get("PunteggioScenari", 0)
-
+            quiz_doc = next(quiz_cursor, None)
+            punteggio_quiz = quiz_doc.get("punteggio_quiz", 0) if quiz_doc else 0
 
             return {"punteggio_quiz": punteggio_quiz, "PunteggioScenari": punteggio_scenari}
+
         except Exception as e:
-            print(f"Errore nel calcolo del punteggio personale: {e}")
+            logger.exception("Errore nel calcolo punteggio personale: %s", e)
             return {"punteggio_quiz": 0, "PunteggioScenari": 0}
 
-    def get_storico(self, cf_studente):
+    def get_storico(self, cf_studente: str):
         """
-        Recupera lo storico dettagliato di tutte le attività dello studente.
+        Recupera storico attività studente.
         """
         try:
-            dashboard_collection = self.db_manager.get_collection("Dashboard")
-            attivita_risultati = list(dashboard_collection.find(
+            dashboard_col = self.db_manager.get_collection("Dashboard")
+            attivita = list(dashboard_col.find(
                 {"cf_studente": cf_studente},
                 {"_id": 0, "id_attivita": 1, "data_attivita": 1, "descrizione_attivita": 1, "punteggio_attivita": 1}
             ))
 
-            for attivita in attivita_risultati:
-                if isinstance(attivita["data_attivita"], datetime):
-                    attivita["data_attivita"] = attivita["data_attivita"].strftime("%d/%m/%Y %H:%M:%S")
+            for a in attivita:
+                dt = a.get("data_attivita")
+                if isinstance(dt, datetime):
+                    a["data_attivita"] = dt.strftime("%d/%m/%Y %H:%M:%S")
 
-            return attivita_risultati
+            return attivita
+
         except Exception as e:
-            print(f"Errore durante il recupero dello storico: {e}")
+            logger.exception("Errore recupero storico: %s", e)
             return []
 
     def get_classi_docente(self, id_docente):
         """
-        Recupera le classi associate a un docente e calcola il punteggio totale di ogni classe.
+        Recupera classi docente e punteggio totale per classe.
+        Ottimizzato: evita aggregazioni globali e riduce query.
         """
         try:
-            collection = self.db_manager.get_collection("ClasseVirtuale")
-            studente_collection = self.db_manager.get_collection("Studente")
-            quiz_collection = self.db_manager.get_collection("RisultatoQuiz")
-            scenario_collection = self.db_manager.get_collection("PunteggioScenario")
+            classi_col = self.db_manager.get_collection("ClasseVirtuale")
+            studente_col = self.db_manager.get_collection("Studente")
+            quiz_col = self.db_manager.get_collection("RisultatoQuiz")
+            scenario_col = self.db_manager.get_collection("PunteggioScenario")
 
-            # Recupera tutte le classi del docente
-            classi = list(collection.find({"id_docente": id_docente}, {"_id": 0, "id_classe": 1, "nome_classe": 1}))
+            classi = list(classi_col.find(
+                {"id_docente": id_docente},
+                {"_id": 0, "id_classe": 1, "nome_classe": 1}
+            ))
+            if not classi:
+                return []
 
+            # Per ciascuna classe serve lista CF studenti. (Qui potresti ottimizzare ulteriormente
+            # con una pipeline aggregata, ma già così eviti sprechi grossi.)
             for classe in classi:
                 id_classe = classe["id_classe"]
 
-                # Recupera gli studenti della classe
-                studenti = list(studente_collection.find({"id_classe": id_classe}, {"cf": 1}))
+                studenti = list(studente_col.find({"id_classe": id_classe}, {"_id": 0, "cf": 1}))
+                cf_studenti = [s["cf"] for s in studenti if s.get("cf")]
 
-                # Calcola il punteggio totale dei quiz per la classe
-                cf_studenti = [studente["cf"] for studente in studenti]
+                if not cf_studenti:
+                    classe["punteggio_totale"] = 0
+                    continue
 
-                punteggio_quiz = quiz_collection.aggregate([
+                quiz_cursor = quiz_col.aggregate([
                     {"$match": {"cf_studente": {"$in": cf_studenti}}},
                     {"$group": {"_id": None, "totale_quiz": {"$sum": "$punteggio_quiz"}}}
                 ])
-                punteggio_quiz_totale = next(punteggio_quiz, {}).get("totale_quiz", 0)
+                punteggio_quiz_totale = (next(quiz_cursor, {}) or {}).get("totale_quiz", 0)
 
-                # Calcola il punteggio totale degli scenari per la classe
-                punteggio_scenario = scenario_collection.aggregate([
+                scenario_cursor = scenario_col.aggregate([
                     {"$match": {"CF_Studente": {"$in": cf_studenti}}},
                     {"$group": {"_id": None, "totale_scenario": {"$sum": "$Punteggio_Scenario"}}}
                 ])
-                punteggio_scenario_totale = next(punteggio_scenario, {}).get("totale_scenario", 0)
+                punteggio_scenario_totale = (next(scenario_cursor, {}) or {}).get("totale_scenario", 0)
 
-                # Somma i punteggi totali
                 classe["punteggio_totale"] = punteggio_quiz_totale + punteggio_scenario_totale
 
-            # Ordina le classi per punteggio totale in ordine decrescente
-            classi.sort(key=lambda x: x["punteggio_totale"], reverse=True)
-
+            classi.sort(key=lambda x: x.get("punteggio_totale", 0), reverse=True)
             return classi
-        except Exception as e:
-            print(f"Errore durante il recupero delle classi del docente: {e}")
-            return []
 
+        except Exception as e:
+            logger.exception("Errore recupero classi docente: %s", e)
+            return []
