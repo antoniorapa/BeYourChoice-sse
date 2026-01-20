@@ -31,11 +31,18 @@ app = Flask(
     static_url_path="/public"
 )
 
-# Compressione
+# Compressione (FIX DEFINITIVO)
 
-app.config["COMPRESS_ALGORITHM"] = ["gzip"]
-app.config["COMPRESS_LEVEL"] = 9
-app.config["COMPRESS_MIN_SIZE"] = 500
+app.config["COMPRESS_ALGORITHM"] = "gzip"
+app.config["COMPRESS_LEVEL"] = 6
+app.config["COMPRESS_MIN_SIZE"] = 0   # <-- FONDAMENTALE
+app.config["COMPRESS_MIMETYPES"] = [
+    "text/html",
+    "text/css",
+    "application/javascript",
+    "application/json",
+    "image/svg+xml"
+]
 
 Compress(app)
 
