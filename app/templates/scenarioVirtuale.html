@@ -40,124 +40,124 @@
 
             <h2>Creazione scenario virtuale</h2>
 
+            <!-- FORM COMPLETO -->
             <form id="formScenario" action="/scenarioVirtuale" method="POST">
+
                 <span>Titolo</span>
-                <input type="text" name="titolo"
-                       placeholder="Inserisci titolo scenario virtuale">
+                <input type="text" name="titolo" placeholder="Inserisci titolo scenario virtuale">
 
                 <span>Descrizione</span>
-                <textarea name="descrizione"
-                          placeholder="Descrivi lo scenario virtuale in dettaglio..."></textarea>
+                <textarea name="descrizione" placeholder="Descrivi lo scenario virtuale in dettaglio..."></textarea>
 
+                <!-- INPUT NASCOSTI -->
                 <input type="hidden" id="selectedArgomento" name="argomento">
-            </form>
+                <input type="hidden" id="modalitaHidden" name="modalita">
 
-            <h2>Modalità di competizione</h2>
+                <h2>Modalità di competizione</h2>
+                <div class="radio-inputs">
+                    <label>
+                        <input class="radio-input" type="radio" name="modalita" value="Cooperativa">
+                        <span class="radio-tile">
+                            <span class="radio-icon"></span>
+                            <span class="radio-label">Cooperativa</span>
+                        </span>
+                    </label>
 
-            <div class="radio-inputs">
-                <label>
-                    <input class="radio-input" type="radio" name="engine">
-                    <span class="radio-tile">
-                        <span class="radio-icon"></span>
-                        <span class="radio-label">Cooperativa</span>
-                    </span>
-                </label>
-
-                <label>
-                    <input checked class="radio-input" type="radio" name="engine">
-                    <span class="radio-tile">
-                        <span class="radio-icon"></span>
-                        <span class="radio-label">Competitiva</span>
-                    </span>
-                </label>
-            </div>
-
-            <h2>Scelta argomento</h2>
-
-            <section class="carousel">
-                <div class="carousel__container">
-
-                    <!-- SOSTENIBILITA -->
-                    <div class="carousel-item">
-                        <img class="carousel-item__img"
-                             src="{{ url_for('static', filename='img_optimized/sostenibilita.jpg') }}"
-                             width="600" height="600" loading="lazy" alt="Sostenibilità">
-                        <div class="carousel-item__details">
-                            <h5>Sostenibilità</h5>
-                            <h6>Politiche per il cambiamento climatico</h6>
-                        </div>
-                    </div>
-
-                    <!-- PARITA' DI GENERE -->
-                    <div class="carousel-item">
-                        <img class="carousel-item__img"
-                             src="{{ url_for('static', filename='img_optimized/paritagenere.jpg') }}"
-                             width="600" height="600" loading="lazy" alt="Parità di genere">
-                        <div class="carousel-item__details">
-                            <h5>Diritti Civili</h5>
-                            <h6>Parità di genere</h6>
-                        </div>
-                    </div>
-
-                    <!-- MIGRANTI -->
-                    <div class="carousel-item">
-                        <img class="carousel-item__img"
-                             src="{{ url_for('static', filename='img_optimized/migranti.jpg') }}"
-                             width="600" height="600" loading="lazy" alt="Diritti dei migranti">
-                        <div class="carousel-item__details">
-                            <h5>Diritti Civili</h5>
-                            <h6>Diritti dei migranti</h6>
-                        </div>
-                    </div>
-
-                    <!-- MEDICINA -->
-                    <div class="carousel-item">
-                        <img class="carousel-item__img"
-                             src="{{ url_for('static', filename='img_optimized/medicina.jpg') }}"
-                             width="600" height="600" loading="lazy" alt="Medicina">
-                        <div class="carousel-item__details">
-                            <h5>Sanità</h5>
-                            <h6>Intelligenza artificiale nella medicina</h6>
-                        </div>
-                    </div>
-
-                    <!-- DROGHE -->
-                    <div class="carousel-item">
-                        <img class="carousel-item__img"
-                             src="{{ url_for('static', filename='img_optimized/droghe.jpg') }}"
-                             width="600" height="600" loading="lazy" alt="Legalizzazione droghe">
-                        <div class="carousel-item__details">
-                            <h5>Società e Cultura</h5>
-                            <h6>Legalizzazione delle droghe leggere</h6>
-                        </div>
-                    </div>
-
-                    <!-- NATO -->
-                    <div class="carousel-item">
-                        <img class="carousel-item__img"
-                             src="{{ url_for('static', filename='img_optimized/nato.jpg') }}"
-                             width="600" height="600" loading="lazy" alt="NATO">
-                        <div class="carousel-item__details">
-                            <h5>Politica Internazionale</h5>
-                            <h6>Espansione della NATO</h6>
-                        </div>
-                    </div>
-
-                    <!-- LAVORO -->
-                    <div class="carousel-item">
-                        <img class="carousel-item__img"
-                             src="{{ url_for('static', filename='img_optimized/lavoro.jpg') }}"
-                             width="600" height="600" loading="lazy" alt="Sicurezza sul lavoro">
-                        <div class="carousel-item__details">
-                            <h5>Economia e Lavoro</h5>
-                            <h6>Sicurezza sul lavoro</h6>
-                        </div>
-                    </div>
-
+                    <label>
+                        <input checked class="radio-input" type="radio" name="engine" value="Competitiva">
+                        <span class="radio-tile">
+                            <span class="radio-icon"></span>
+                            <span class="radio-label">Competitiva</span>
+                        </span>
+                    </label>
                 </div>
-            </section>
 
-            <button class="button_2" type="submit">CREA SCENARIO</button>
+                <h2>Scelta argomento</h2>
+                <section class="carousel">
+                    <div class="carousel__container" id="carouselContainer">
+
+                        <!-- SOSTENIBILITA -->
+                        <div class="carousel-item" data-argomento="Politiche per il cambiamento climatico">
+                            <img class="carousel-item__img"
+                                 src="{{ url_for('static', filename='img_optimized/sostenibilita.jpg') }}"
+                                 width="600" height="600" loading="lazy" alt="Sostenibilità">
+                            <div class="carousel-item__details">
+                                <h5>Sostenibilità</h5>
+                                <h6>Politiche per il cambiamento climatico</h6>
+                            </div>
+                        </div>
+
+                        <!-- PARITA' DI GENERE -->
+                        <div class="carousel-item" data-argomento="Parità di genere">
+                            <img class="carousel-item__img"
+                                 src="{{ url_for('static', filename='img_optimized/paritagenere.jpg') }}"
+                                 width="600" height="600" loading="lazy" alt="Parità di genere">
+                            <div class="carousel-item__details">
+                                <h5>Diritti Civili</h5>
+                                <h6>Parità di genere</h6>
+                            </div>
+                        </div>
+
+                        <!-- MIGRANTI -->
+                        <div class="carousel-item" data-argomento="Diritti dei migranti">
+                            <img class="carousel-item__img"
+                                 src="{{ url_for('static', filename='img_optimized/migranti.jpg') }}"
+                                 width="600" height="600" loading="lazy" alt="Diritti dei migranti">
+                            <div class="carousel-item__details">
+                                <h5>Diritti Civili</h5>
+                                <h6>Diritti dei migranti</h6>
+                            </div>
+                        </div>
+
+                        <!-- MEDICINA -->
+                        <div class="carousel-item" data-argomento="Intelligenza artificiale nella medicina">
+                            <img class="carousel-item__img"
+                                 src="{{ url_for('static', filename='img_optimized/medicina.jpg') }}"
+                                 width="600" height="600" loading="lazy" alt="Medicina">
+                            <div class="carousel-item__details">
+                                <h5>Sanità</h5>
+                                <h6>Intelligenza artificiale nella medicina</h6>
+                            </div>
+                        </div>
+
+                        <!-- DROGHE -->
+                        <div class="carousel-item" data-argomento="Legalizzazione delle droghe leggere">
+                            <img class="carousel-item__img"
+                                 src="{{ url_for('static', filename='img_optimized/droghe.jpg') }}"
+                                 width="600" height="600" loading="lazy" alt="Legalizzazione droghe">
+                            <div class="carousel-item__details">
+                                <h5>Società e Cultura</h5>
+                                <h6>Legalizzazione delle droghe leggere</h6>
+                            </div>
+                        </div>
+
+                        <!-- NATO -->
+                        <div class="carousel-item" data-argomento="Espansione della NATO">
+                            <img class="carousel-item__img"
+                                 src="{{ url_for('static', filename='img_optimized/nato.jpg') }}"
+                                 width="600" height="600" loading="lazy" alt="NATO">
+                            <div class="carousel-item__details">
+                                <h5>Politica Internazionale</h5>
+                                <h6>Espansione della NATO</h6>
+                            </div>
+                        </div>
+
+                        <!-- LAVORO -->
+                        <div class="carousel-item" data-argomento="Sicurezza sul lavoro">
+                            <img class="carousel-item__img"
+                                 src="{{ url_for('static', filename='img_optimized/lavoro.jpg') }}"
+                                 width="600" height="600" loading="lazy" alt="Sicurezza sul lavoro">
+                            <div class="carousel-item__details">
+                                <h5>Economia e Lavoro</h5>
+                                <h6>Sicurezza sul lavoro</h6>
+                            </div>
+                        </div>
+
+                    </div>
+                </section>
+
+                <button class="button_2" type="submit">CREA SCENARIO</button>
+            </form>
 
         </div>
     </div>
