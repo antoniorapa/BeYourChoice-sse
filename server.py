@@ -32,10 +32,12 @@ app = Flask(
 )
 
 # Compressione
+
+app.config["COMPRESS_ALGORITHM"] = ["gzip"]
+app.config["COMPRESS_LEVEL"] = 9
+app.config["COMPRESS_MIN_SIZE"] = 500
+
 Compress(app)
-app.config["COMPRESS_ALGORITHM"] = "gzip"
-app.config["COMPRESS_LEVEL"] = 6
-app.config["COMPRESS_MIN_SIZE"] = 0
 
 # Timer + Cache
 @app.before_request
