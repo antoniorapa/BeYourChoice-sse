@@ -1,4 +1,4 @@
-from flask import Flask, render_template, session, redirect, url_for, request
+from flask import Flask, render_template, session, redirect, url_for, request, send_from_directory
 from flask_compress import Compress
 import logging
 import time
@@ -99,6 +99,19 @@ def home():
         )
 
     return redirect(url_for('login.login'))
+
+@app.route('/css/<path:filename>')
+def compressed_css(filename):
+    gz_path = os.path.join(app.static_folder, 'css', filename + '.gz')
+
+    if os.path.exists(gz_path):
+        response = send_from_directory(os.path.join(app.static_folder, 'css'), filename + '.gz')
+        response.headers['Content-Encoding'] = 'gzip'
+        response.headers['Content-Type'] = 'text/css'
+        return response
+
+    return send_from_directory(os.path.join(app.static_folder, 'css'), filename)
+
 
 # Blueprint
 app.register_blueprint(classedocente, url_prefix='/classedocente')
